@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VillainPatti Fly</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      background-color: #87ceeb;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    #game {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      background: linear-gradient(to bottom, #87ceeb, #fff);
+    }
+    #character {
+      width: 100px;
+      height: 100px;
+      position: absolute;
+      top: 200px;
+      left: 100px;
+      z-index: 10;
+    }
+    .pipe {
+      position: absolute;
+      width: 60px;
+      background-color: green;
+    }
+    .pipe-top {
+      top: 0;
+    }
+    .pipe-bottom {
+      bottom: 0;
+    }
+    #score {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      font-size: 24px;
+      color: #000;
+      z-index: 20;
+    }
+    #uploader {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 20;
+    }
+    #enemy {
+      width: 80px;
+      height: 80px;
+      position: absolute;
+      top: 300px;
+      left: 100%;
+      display: block;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <img id="character" src="IMG_20250420_175916.png" alt="Villainpatti" />
+    <img id="enemy" src="IMG_20250420_182902.png" alt="Enemy" />
+    <input type="file" id="uploader" accept="image/*" />
+    <div id="score">Score: 0</div>
+
+    <!-- Sound Effects -->
+    <audio id="jumpSound" src="maro-jump-sound-effect_1.mp3" preload="auto"></audio>
+    <audio id="scoreSound" src="super-mario-coin-sound.mp3" preload="auto"></audio>
+    <audio id="hitSound" src="super-mario-death-sound-sound-effect.mp3" preload="auto"></audio>
+  </div>
+
+  <script>
+    const character = document.getElementById("character");
+    const enemy = document.getElementById("enemy");
+    const game = document.getElementById("game");
+    const scoreDisplay = document.getElementById("score");
+    const uploader = document.getElementById("uploader");
+
+    const jumpSound = document.getElementById("jumpSound");
+    const scoreSound = document.getElementById("scoreSound");
+    const hitSound = document.getElementById("hitSound");
+
+    let characterTop = 200;
+    let gravity = 2;
+    let jump = 40;
+    let score = 0;
+    let pipes = [];
+    let enemyX = window.innerWidth;
+
+    uploader.addEventListener("change", (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const url = URL.createObjectURL(file);
+        character.src = url;
+      }
+    });
+
+    function jumpCharacter() {
+      characterTop -= jump;
+      jumpSound.currentTime = 0;
+      jumpSound.play();
+    }
+
+    document.addEventListener("keydown", jumpCharacter);
+    document.addEventListener("click", jumpCharacter);
+
+    function createPipe() {
+      const gap = 300;
+      const topHeight = Math.floor(Math.random() * 300) + 50;
+      const bottomHeight = window.innerHeight - topHeight - gap;
+      const pipeX = window.innerWidth;
+
+      const topPipe = document.createElement("div");
+      topPipe.classList.add("pipe", "pipe-top");
+      topPipe.style.height = `${topHeight}px`;
+      topPipe.style.left = `${pipeX}px`;
+
+      const bottomPipe = document.createElement("div");
+      bottomPipe.classList.add("pipe", "pipe-bottom");
+      bottomPipe.style.height = `${bottomHeight}px`;
+      bottomPipe.style.left = `${pipeX}px`;
+
+      game.appendChild(topPipe);
+      game.appendChild(bottomPipe);
+
+      pipes.push({ top: topPipe, bottom: bottomPipe, x: pipeX });
+    }
+
+    function checkCollision(pipe) {
+      const charRect = character.getBoundingClientRect();
+      const topRect = pipe.top.getBoundingClientRect();
+      const bottomRect = pipe.bottom.getBoundingClientRect();
+
+      return (
+        charRect.top < topRect.bottom ||
+        charRect.bottom > bottomRect.top
+      );
+    }
+
+    function checkEnemyCollision() {
+      const charRect = character.getBoundingClientRect();
+      const enemyRect = enemy.getBoundingClientRect();
+      return !(
+        charRect.right < enemyRect.left ||
+        charRect.left > enemyRect.right ||
+        charRect.bottom < enemyRect.top ||
+        charRect.top > enemyRect.bottom
+      );
+    }
+
+    function moveEnemy() {
+      enemyX -= 3;
+      if (enemyX < -80) {
+        enemyX = window.innerWidth + Math.random() * 300;
+        enemy.style.top = Math.floor(Math.random() * (window.innerHeight - 100)) + "px";
+      }
+      enemy.style.left = enemyX + "px";
+    }
+
+    function gameLoop() {
+      characterTop += gravity;
+      if (characterTop < 0) characterTop = 0;
+      if (characterTop > window.innerHeight - 100) {
+        endGame();
+        return;
+      }
+      character.style.top = characterTop + "px";
+
+      for (let i = 0; i < pipes.length; i++) {
+        pipes[i].x -= 2;
+        pipes[i].top.style.left = pipes[i].x + "px";
+        pipes[i].bottom.style.left = pipes[i].x + "px";
+
+        if (pipes[i].x + 60 < 100 && !pipes[i].passed) {
+          pipes[i].passed = true;
+          score++;
+          scoreDisplay.innerText = "Score: " + score;
+          scoreSound.currentTime = 0;
+          scoreSound.play();
+        }
+
+        if (
+          pipes[i].x < 140 &&
+          pipes[i].x + 60 > 100 &&
+          checkCollision(pipes[i])
+        ) {
+          endGame();
+          return;
+        }
+      }
+
+      moveEnemy();
+      if (checkEnemyCollision()) {
+        endGame();
+        return;
+      }
+
+      if (pipes.length === 0 || pipes[pipes.length - 1].x < window.innerWidth - 300) {
+        createPipe();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+      hitSound.currentTime = 0;
+      hitSound.play();
+
+      const respawn = confirm(`Game Over! Your score is ${score}. Do you want to play again?`);
+      if (respawn) {
+        location.reload();
+      }
+    }
+
+    createPipe();
+    gameLoop();
+  </script>
+</body>
+</html>
